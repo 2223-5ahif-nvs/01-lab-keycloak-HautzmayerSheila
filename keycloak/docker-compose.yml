@@ -1,0 +1,52 @@
+version: "3.9"
+services:
+  postgres:
+    container_name: postgres_keycloak
+    image: "postgres:13.2"
+    volumes:
+      - ./db-data:/var/lib/postgresql/data/
+      - ./sql:/docker-entrypoint-initdb.d/:ro
+    env_file:
+      - ./keycloak-postgres.env
+    networks:
+      - keycloak
+    ports:
+      - "5432:5432"
+  pgadmin:
+    container_name: pgadmin_keycloak
+    image: "dpage/pgadmin4:5.1"
+    env_file:
+      - ./keycloak-postgres.env
+    ports:
+      - "5050:80"
+    networks:
+      - keycloak
+
+  keycloak:
+    container_name: keycloak
+    image: ghcr.io/flo-kei/prebuilt_keycloak
+    command:
+      - start --optimized
+      - "-Dkeycloak.import=/opt/jboss/keycloak/imports/quarkus-realm.json"
+    depends_on:
+      - "postgres"
+    env_file:
+      - ./keycloak-postgres.env
+      #ports:
+      #- "127.0.0.1:8080:8080"
+      #- "127.0.0.1:8787:8787" # debug port
+    networks:
+      - keycloak
+    volumes:
+      - ./imports:/opt/jboss/keycloak/imports
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`auth.flokei.at`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls.certresolver=myresolver"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+
+networks:
+  keycloak:
+    name: keycloak
+    driver: bridge
